@@ -1,60 +1,75 @@
+// Importaciones necesarias
 import { useState, useEffect } from 'react';
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { db } from "@/lib/firebase";
-import { getDocs, collection, addDoc } from "firebase/firestore";
+import { Table, Button, Input, Card, CardContent } from '@/components/ui';
+import { db } from '@/lib/firebase';
+import { getDocs, collection, addDoc, onSnapshot } from 'firebase/firestore';
 
 export default function ChorizeitorApp() {
     const [productos, setProductos] = useState([]);
-    const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", precio: "" });
-
+    const [nuevoProducto, setNuevoProducto] = useState({ nombre: '', precio: 0, ingredientes: [] });
+    const [ventas, setVentas] = useState({ local: 0, domicilio: 0 });
+    
+    // Escuchar cambios en la base de datos en tiempo real
     useEffect(() => {
-        async function fetchProductos() {
-            const querySnapshot = await getDocs(collection(db, "productos"));
-            setProductos(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        }
-        fetchProductos();
+        const unsubscribe = onSnapshot(collection(db, 'productos'), (snapshot) => {
+            setProductos(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+        return () => unsubscribe();
     }, []);
 
     const agregarProducto = async () => {
         if (nuevoProducto.nombre && nuevoProducto.precio) {
-            const docRef = await addDoc(collection(db, "productos"), nuevoProducto);
-            setProductos([...productos, { id: docRef.id, ...nuevoProducto }]);
-            setNuevoProducto({ nombre: "", precio: "" });
+            await addDoc(collection(db, 'productos'), nuevoProducto);
+            setNuevoProducto({ nombre: '', precio: 0, ingredientes: [] });
         }
+    };
+
+    const registrarVenta = async (tipo) => {
+        setVentas(prev => ({ ...prev, [tipo]: prev[tipo] + 1 }));
+        await addDoc(collection(db, 'ventas'), { tipo, fecha: new Date() });
     };
 
     return (
         <div className="p-4">
             <h1 className="text-xl font-bold mb-4">Gestión de Inventario - Chorizeitor</h1>
+            
             <Card>
-                <CardContent className="p-4">
-                    <h2 className="text-lg font-semibold mb-2">Agregar Producto</h2>
-                    <div className="flex gap-2">
-                        <Input placeholder="Nombre" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })} />
-                        <Input placeholder="Precio" type="number" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio: e.target.value })} />
-                        <Button onClick={agregarProducto}>Agregar</Button>
-                    </div>
+                <CardContent>
+                    <Input placeholder="Nombre del producto" value={nuevoProducto.nombre} 
+                           onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })} />
+                    <Input type="number" placeholder="Precio" value={nuevoProducto.precio} 
+                           onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio: Number(e.target.value) })} />
+                    <Button onClick={agregarProducto}>Agregar Producto</Button>
                 </CardContent>
             </Card>
-            <Table className="mt-4">
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Nombre</TableHead>
-                        <TableHead>Precio</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {productos.map(producto => (
-                        <TableRow key={producto.id}>
-                            <TableCell>{producto.nombre}</TableCell>
-                            <TableCell>${producto.precio}</TableCell>
-                        </TableRow>
+
+            <Table>
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Precio</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {productos.map(prod => (
+                        <tr key={prod.id}>
+                            <td>{prod.nombre}</td>
+                            <td>${prod.precio}</td>
+                        </tr>
                     ))}
-                </TableBody>
+                </tbody>
             </Table>
+
+            <div className="mt-4">
+                <h2 className="text-lg font-bold">Ventas</h2>
+                <p>Ventas en Local: {ventas.local}</p>
+                <p>Ventas a Domicilio: {ventas.domicilio}</p>
+                <Button onClick={() => registrarVenta('local')}>Registrar Venta en Local</Button>
+                <Button onClick={() => registrarVenta('domicilio')}>Registrar Venta a Domicilio</Button>
+            </div>
         </div>
+    );
+}
+
     );
 }
