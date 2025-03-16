@@ -1,0 +1,60 @@
+import { useState, useEffect } from 'react';
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
+import { db } from "@/lib/firebase";
+import { getDocs, collection, addDoc } from "firebase/firestore";
+
+export default function ChorizeitorApp() {
+    const [productos, setProductos] = useState([]);
+    const [nuevoProducto, setNuevoProducto] = useState({ nombre: "", precio: "" });
+
+    useEffect(() => {
+        async function fetchProductos() {
+            const querySnapshot = await getDocs(collection(db, "productos"));
+            setProductos(querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        }
+        fetchProductos();
+    }, []);
+
+    const agregarProducto = async () => {
+        if (nuevoProducto.nombre && nuevoProducto.precio) {
+            const docRef = await addDoc(collection(db, "productos"), nuevoProducto);
+            setProductos([...productos, { id: docRef.id, ...nuevoProducto }]);
+            setNuevoProducto({ nombre: "", precio: "" });
+        }
+    };
+
+    return (
+        <div className="p-4">
+            <h1 className="text-xl font-bold mb-4">Gestión de Inventario - Chorizeitor</h1>
+            <Card>
+                <CardContent className="p-4">
+                    <h2 className="text-lg font-semibold mb-2">Agregar Producto</h2>
+                    <div className="flex gap-2">
+                        <Input placeholder="Nombre" value={nuevoProducto.nombre} onChange={(e) => setNuevoProducto({ ...nuevoProducto, nombre: e.target.value })} />
+                        <Input placeholder="Precio" type="number" value={nuevoProducto.precio} onChange={(e) => setNuevoProducto({ ...nuevoProducto, precio: e.target.value })} />
+                        <Button onClick={agregarProducto}>Agregar</Button>
+                    </div>
+                </CardContent>
+            </Card>
+            <Table className="mt-4">
+                <TableHeader>
+                    <TableRow>
+                        <TableHead>Nombre</TableHead>
+                        <TableHead>Precio</TableHead>
+                    </TableRow>
+                </TableHeader>
+                <TableBody>
+                    {productos.map(producto => (
+                        <TableRow key={producto.id}>
+                            <TableCell>{producto.nombre}</TableCell>
+                            <TableCell>${producto.precio}</TableCell>
+                        </TableRow>
+                    ))}
+                </TableBody>
+            </Table>
+        </div>
+    );
+}
